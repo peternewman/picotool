@@ -2069,19 +2069,21 @@ int main(int argc, char **argv) {
 
         // we only loop a second time if we want to reboot some devices (which may cause device
         for (int tries = 0; !rc && tries < 2; tries++) {
-            if (libusb_get_device_list(ctx, &devs) < 0) {
-                fail(ERROR_USB, "Failed to enumerate USB devices\n");
-            }
-            for (libusb_device **dev = devs; *dev; dev++) {
-                if (settings.bus != -1 && settings.bus != libusb_get_bus_number(*dev)) continue;
-                if (settings.address != -1 && settings.address != libusb_get_device_address(*dev)) continue;
-                libusb_device_handle *handle = nullptr;
-                auto result = picoboot_open_device(*dev, &handle);
-                if (handle) {
-                    to_close.push_back(handle);
+            if (ctx) {
+                if (libusb_get_device_list(ctx, &devs) < 0) {
+                    fail(ERROR_USB, "Failed to enumerate USB devices\n");
                 }
-                if (result != dr_error) {
-                    devices[result].push_back(std::make_pair(*dev, handle));
+                for (libusb_device **dev = devs; *dev; dev++) {
+                    if (settings.bus != -1 && settings.bus != libusb_get_bus_number(*dev)) continue;
+                    if (settings.address != -1 && settings.address != libusb_get_device_address(*dev)) continue;
+                    libusb_device_handle *handle = nullptr;
+                    auto result = picoboot_open_device(*dev, &handle);
+                    if (handle) {
+                        to_close.push_back(handle);
+                    }
+                    if (result != dr_error) {
+                        devices[result].push_back(std::make_pair(*dev, handle));
+                    }
                 }
             }
             auto supported = selected_cmd->get_device_support();
@@ -2126,31 +2128,34 @@ int main(int argc, char **argv) {
                     break;
             }
             if (!rc) {
-                if (settings.force && devices[dr_vidpid_stdio_usb].size() != 1) {
-                    fail(ERROR_NOT_POSSIBLE,
-                         "Forced command requires a single rebootable RP2040 device to be targeted.");
-                }
-                if (settings.force && selected_cmd->force_requires_pre_reboot()) {
-                    // we reboot into BOOTSEL mode and disable MSC interface (the 1 here)
-                    auto &to_reboot = devices[dr_vidpid_stdio_usb][0].first;
-                    reboot_device(to_reboot, true, 1);
-                    std::cout << "The device was rebooted as requested into BOOTSEL mode so the command can be executed.\n\n";
-                    for (const auto &handle : to_close) {
-                        libusb_close(handle);
+                if (settings.force && ctx) { // actually ctx should never be null if force is set, but still
+                    if (devices[dr_vidpid_stdio_usb].size() != 1) {
+                        fail(ERROR_NOT_POSSIBLE,
+                             "Forced command requires a single rebootable RP2040 device to be targeted.");
                     }
-                    libusb_free_device_list(devs, 1);
-                    devs = nullptr;
-                    to_close.clear();
-                    devices.clear();
-                    sleep_ms(500);
+                    if (selected_cmd->force_requires_pre_reboot()) {
+                        // we reboot into BOOTSEL mode and disable MSC interface (the 1 here)
+                        auto &to_reboot = devices[dr_vidpid_stdio_usb][0].first;
+                        reboot_device(to_reboot, true, 1);
+                        std::cout
+                                << "The device was rebooted as requested into BOOTSEL mode so the command can be executed.\n\n";
+                        for (const auto &handle : to_close) {
+                            libusb_close(handle);
+                        }
+                        libusb_free_device_list(devs, 1);
+                        devs = nullptr;
+                        to_close.clear();
+                        devices.clear();
+                        sleep_ms(500);
 
-                    // we now clear settings.force, because we expect the device to have rebooted and be available.
-                    // we also clear any filters, because the device may have moved, so the only way we can find it
-                    // again is to assume it is the only now visible device.
-                    settings.force = false;
-                    settings.address = -1;
-                    settings.bus = -1;
-                    continue;
+                        // we now clear settings.force, because we expect the device to have rebooted and be available.
+                        // we also clear any filters, because the device may have moved, so the only way we can find it
+                        // again is to assume it is the only now visible device.
+                        settings.force = false;
+                        settings.address = -1;
+                        settings.bus = -1;
+                        continue;
+                    }
                 }
                 selected_cmd->execute(devices);
                 if (tries) {
