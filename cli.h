@@ -358,6 +358,7 @@ namespace cli {
             return *this;
         }
 
+
         template<typename T>
         option &clear(T &t) {
             // note we cannot capture "this"

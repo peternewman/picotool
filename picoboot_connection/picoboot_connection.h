@@ -24,6 +24,7 @@ enum picoboot_device_result {
     dr_vidpid_picoprobe,
     dr_vidpid_unknown,
     dr_error,
+    dr_vidpid_stdio_usb,
 };
 
 enum picoboot_device_result picoboot_open_device(libusb_device *device, libusb_device_handle **dev_handle);
