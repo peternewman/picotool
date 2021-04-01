@@ -1941,8 +1941,11 @@ static int reboot_device(libusb_device *device, bool bootsel, uint disable_mask=
     libusb_device_handle *dev_handle;
     ret = libusb_open(device, &dev_handle);
     if (ret) {
-        // todo better error message
-        fail(ERROR_USB, "Failed to open device %d\n", ret);
+#if _MSC_VER
+        fail(ERROR_USB, "Unable to access device to reboot it; Make sure there is a driver installed via Zadig\n", ret);
+#else
+        fail(ERROR_USB, "Unable to access device to reboot it; Use sudo or setup a udev rule\n", ret);
+#endif
     }
     for (int i = 0; i < config->bNumInterfaces; i++) {
         if (0xff == config->interface[i].altsetting[0].bInterfaceClass &&
