@@ -9,6 +9,7 @@
 
 // todo we should use fully encapsulate libusb
 
+#include <assert.h>
 #include <libusb.h>
 #include "boot/picoboot.h"
 
